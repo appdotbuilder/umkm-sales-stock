@@ -1,12 +1,23 @@
+import { db } from '../db';
+import { productsTable } from '../db/schema';
 import { type Product } from '../schema';
+import { asc } from 'drizzle-orm';
 
-export async function getProducts(): Promise<Product[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching all products from the database.
-    // Steps to implement:
-    // 1. Query all products from products table using drizzle
-    // 2. Order by created_at or name for consistent results
-    // 3. Return array of products with proper type conversion
-    
-    return Promise.resolve([]);
-}
+export const getProducts = async (): Promise<Product[]> => {
+  try {
+    // Query all products from the database, ordered by name for consistent results
+    const results = await db.select()
+      .from(productsTable)
+      .orderBy(asc(productsTable.name))
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    return results.map(product => ({
+      ...product,
+      price: parseFloat(product.price) // Convert string back to number
+    }));
+  } catch (error) {
+    console.error('Failed to fetch products:', error);
+    throw error;
+  }
+};

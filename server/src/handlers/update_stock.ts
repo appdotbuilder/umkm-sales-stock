@@ -1,3 +1,6 @@
+import { db } from '../db';
+import { productsTable } from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { type Product } from '../schema';
 
 export interface UpdateStockInput {
@@ -7,24 +10,46 @@ export interface UpdateStockInput {
 }
 
 export async function updateStock(input: UpdateStockInput): Promise<Product> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is manually adjusting product stock levels.
-    // Steps to implement:
-    // 1. Check if product exists
-    // 2. Calculate new stock quantity (current + quantity_change)
-    // 3. Ensure stock doesn't go below 0
-    // 4. Update product stock_quantity and updated_at timestamp
-    // 5. Optionally log stock adjustment with reason
-    // 6. Return updated product
-    
-    return Promise.resolve({
-        id: input.product_id,
-        name: "Placeholder Product",
-        description: null,
-        price: 0,
-        stock_quantity: Math.max(0, input.quantity_change), // Ensure non-negative
-        min_stock_threshold: 10,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Product);
+    try {
+        // First, get the current product to check if it exists and get current stock
+        const existingProducts = await db.select()
+            .from(productsTable)
+            .where(eq(productsTable.id, input.product_id))
+            .execute();
+
+        if (existingProducts.length === 0) {
+            throw new Error(`Product with ID ${input.product_id} not found`);
+        }
+
+        const existingProduct = existingProducts[0];
+        
+        // Calculate new stock quantity
+        const newStockQuantity = existingProduct.stock_quantity + input.quantity_change;
+        
+        // Ensure stock doesn't go below 0
+        if (newStockQuantity < 0) {
+            throw new Error(`Insufficient stock. Current stock: ${existingProduct.stock_quantity}, attempted change: ${input.quantity_change}`);
+        }
+
+        // Update the product with new stock quantity and updated timestamp
+        const updatedProducts = await db.update(productsTable)
+            .set({
+                stock_quantity: newStockQuantity,
+                updated_at: new Date()
+            })
+            .where(eq(productsTable.id, input.product_id))
+            .returning()
+            .execute();
+
+        const updatedProduct = updatedProducts[0];
+        
+        // Convert numeric fields back to numbers for the response
+        return {
+            ...updatedProduct,
+            price: parseFloat(updatedProduct.price)
+        };
+    } catch (error) {
+        console.error('Stock update failed:', error);
+        throw error;
+    }
 }

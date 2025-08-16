@@ -1,12 +1,37 @@
+import { db } from '../db';
+import { productsTable, salesTransactionItemsTable } from '../db/schema';
+import { eq } from 'drizzle-orm';
+
 export async function deleteProduct(id: number): Promise<{ success: boolean }> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is deleting a product from the database.
-    // Steps to implement:
-    // 1. Check if product exists and has no associated sales transactions
-    // 2. If product has sales history, mark as inactive instead of deleting
-    // 3. Delete the product from products table using drizzle
-    // 4. Return success status
-    // 5. Throw error if product not found or has associated transactions
-    
-    return Promise.resolve({ success: true });
+  try {
+    // Check if product exists
+    const existingProduct = await db.select()
+      .from(productsTable)
+      .where(eq(productsTable.id, id))
+      .execute();
+
+    if (existingProduct.length === 0) {
+      throw new Error('Product not found');
+    }
+
+    // Check if product has associated sales transaction items
+    const salesItems = await db.select()
+      .from(salesTransactionItemsTable)
+      .where(eq(salesTransactionItemsTable.product_id, id))
+      .execute();
+
+    if (salesItems.length > 0) {
+      throw new Error('Cannot delete product with existing sales history');
+    }
+
+    // Delete the product
+    await db.delete(productsTable)
+      .where(eq(productsTable.id, id))
+      .execute();
+
+    return { success: true };
+  } catch (error) {
+    console.error('Product deletion failed:', error);
+    throw error;
+  }
 }
